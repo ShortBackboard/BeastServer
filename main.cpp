@@ -1,9 +1,3 @@
-/*
-	服务器类
-
-	监听客户端，接受到一个连接就创建一个Connection类
-*/
-
 #include <iostream>
 #include <boost/beast.hpp>
 #include <boost/asio.hpp>
@@ -11,6 +5,11 @@
 
 #include "./Connection/Connection.h"
 
+/*
+	服务器类
+
+	监听客户端，接受到一个连接就创建一个Connection类
+*/
 void Server(boost::asio::ip::tcp::acceptor &acceptor, boost::asio::ip::tcp::socket &socket)
 {
 	acceptor.async_accept(socket,
@@ -32,6 +31,18 @@ int main()
 		std::cout << "Server start on port : " << port << std::endl;
 
 		boost::asio::io_context ioc{1};
+
+		// 注册捕捉信号，捕获到该信号服务器就安全的退出
+		// SIGINT：Ctrl + C
+    // SIGTERM：kill
+    boost::asio::signal_set signals(ioc, SIGINT, SIGTERM);
+
+		// 异步等待，捕获到信号就触发
+		signals.async_wait([&ioc](auto, auto) {
+			ioc.stop();
+			std::cout << "Server stop" << std::endl;
+		});
+
 
 		boost::asio::ip::tcp::acceptor acceptor{ioc, {address, port}};
 		boost::asio::ip::tcp::socket socket{ioc};
