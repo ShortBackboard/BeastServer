@@ -1,5 +1,7 @@
+# CMake 最低版本号要求
 cmake_minimum_required(VERSION 3.22)
 
+# 项目信息
 project(BeastServer LANGUAGES CXX)
 
 add_executable( BeastServer )
@@ -7,14 +9,17 @@ add_executable( BeastServer )
 target_sources( BeastServer 
     PRIVATE
         main.cpp
-        
     PUBLIC
-        
 )
+
 
 target_compile_features( BeastServer PRIVATE cxx_std_11 )
 
-# SET(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} "-pthread")
+# 链接库
+target_link_libraries(BeastServer jsoncpp)
+
+# 指定编译参数
+set(CMAKE_CXX_FLAGS_RELEASE "$ENV{CXXFLAGS} -O3 -Wall -std=c++11")
 
 
 
