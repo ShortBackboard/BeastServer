@@ -9,6 +9,12 @@ add_executable( BeastServer )
 target_sources( BeastServer 
     PRIVATE
         main.cpp
+
+        ./ServerStateInfo/Singleton.h
+        ./ServerStateInfo/ServerStateInfo.h
+
+
+        
     PUBLIC
 )
 
