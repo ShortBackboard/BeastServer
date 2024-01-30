@@ -13,6 +13,7 @@ target_sources( BeastServer
         ./ServerStateInfo/Singleton.h
         ./ServerStateInfo/ServerStateInfo.h
 
+        ./Connection/Connection.h ./Connection/Connection.cpp
 
         
     PUBLIC

@@ -1,28 +1,49 @@
-#include <iostream>
-#include <jsoncpp/json/json.h> // JSON库
-#include <jsoncpp/json/value.h>
-#include <jsoncpp/json/reader.h>
+/*
+	服务器类
 
-using namespace std;
+	监听客户端，接受到一个连接就创建一个Connection类
+*/
+
+#include <iostream>
+#include <boost/beast.hpp>
+#include <boost/asio.hpp>
+#include <memory.h>
+
+#include "./Connection/Connection.h"
+
+void Server(boost::asio::ip::tcp::acceptor &acceptor, boost::asio::ip::tcp::socket &socket)
+{
+	acceptor.async_accept(socket,
+												[&](boost::beast::error_code ec)
+												{
+													if (!ec)
+														std::make_shared<Connection>(std::move(socket))->start();
+													Server(acceptor, socket);
+												});
+}
 
 int main()
 {
-  Json::Value root;
-  root["id"] = 1001;
-  root["data"] = "hello world";
-  
-  // 序列化
-  // 结果保存在request中
-  std::string request = root.toStyledString();
-  std::cout << "request is " << request << std::endl;
+	try
+	{
+		auto const address = boost::asio::ip::make_address("127.0.0.1");
+		unsigned short port = static_cast<unsigned short>(10000);
 
+		std::cout << "Server start on port : " << port << std::endl;
 
-  // 反序列化
-  Json::Value ans;
-  Json::Reader reader;
-  // 结果保存在对象ans中
-  reader.parse(request, ans);
-  std::cout << "msg id is " << ans["id"] << " msg is " << ans["data"] << std::endl;
+		boost::asio::io_context ioc{1};
 
-  return 0;
+		boost::asio::ip::tcp::acceptor acceptor{ioc, {address, port}};
+		boost::asio::ip::tcp::socket socket{ioc};
+		Server(acceptor, socket);
+
+		ioc.run();
+	}
+	catch (std::exception const &e)
+	{
+		std::cerr << "Error: " << e.what() << std::endl;
+		return EXIT_FAILURE;
+	}
+
+	return 0;
 }

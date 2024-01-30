@@ -52,6 +52,6 @@ private:
   http::request<http::dynamic_body> _request; // 存储请求信息
   http::response<http::dynamic_body> _response; // 存储响应信息
   net::steady_timer _deadline{
-    _socket.get_executor(), std::chrono::seconds(15);
+    _socket.get_executor(), std::chrono::seconds(15)
   }; // 定时器15s
 };

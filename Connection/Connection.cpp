@@ -1,5 +1,8 @@
 #include "Connection.h"
 
+#include "../ServerStateInfo/ServerStateInfo.h"
+auto serverStateInfo = ServerStateInfo::GetInstance();
+
 Connection::Connection(tcp::socket socket)
     : _socket(std::move(socket))
 {
@@ -77,7 +80,7 @@ void Connection::create_post_response()
 void Connection::create_get_response()
 {
   // 请求的路由
-  // 127.0.0.1:8080/count
+  // 127.0.0.1:10000/count
   if (_request.target() == "/count")
   {
     _response.set(http::field::content_type, "text/html");
@@ -87,7 +90,7 @@ void Connection::create_get_response()
         << "<body>\n"
         << "<h1>Request count</h1>\n"
         << "<p>There have been "
-        << serverStateInfo->_requestcount()
+        << serverStateInfo->request_count()
         << " requests so far.</p>\n"
         << "</body>\n"
         << "</html>\n";
