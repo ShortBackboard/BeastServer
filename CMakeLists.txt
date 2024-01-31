@@ -14,6 +14,7 @@ target_sources( BeastServer
         ./ServerStateInfo/ServerStateInfo.h
 
         ./Connection/Connection.h ./Connection/Connection.cpp
+        ./IOServicePool/AsioIOServicePool.h ./IOServicePool/AsioIOServicePool.cpp
 
         
     PUBLIC

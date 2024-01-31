@@ -21,7 +21,7 @@ cmake .. && make
 
 1.实现http的get、post请求
 
-http://127.0.0.1:10000/time
+<http://127.0.0.1:10000/time>
 
 2.使用C++11智能指针引用技术模拟伪闭包延长连接的生命周期，防止多重析构
 
@@ -30,9 +30,9 @@ http://127.0.0.1:10000/time
 4.升级http，实现websocket协议echo模式服务器
 ws//127.0.0.1:10000
 
-todo
+5.asio多线程模式，IOServicePool，一个线程创建一个iocontext，每个iocontext处理多个socket，提高处理请求的效率
 
-5.asio多线程模式，IOServicePool，一个线程对应一个iocontext，提高处理请求的效率
+todo
 
 6.单例异步日志系统
 
