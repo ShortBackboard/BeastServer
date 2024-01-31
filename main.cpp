@@ -10,14 +10,14 @@
 
 	监听客户端，接受到一个连接就创建一个Connection类
 */
-void Server(boost::asio::ip::tcp::acceptor &acceptor, boost::asio::ip::tcp::socket &socket)
+void Server(boost::asio::ip::tcp::acceptor &acceptor, boost::asio::ip::tcp::socket &socket, boost::asio::io_context& ioc)
 {
 	acceptor.async_accept(socket,
 												[&](boost::beast::error_code ec)
 												{
 													if (!ec)
-														std::make_shared<Connection>(std::move(socket))->start();
-													Server(acceptor, socket);
+														std::make_shared<Connection>(std::move(socket), ioc)->start();
+													Server(acceptor, socket, ioc);
 												});
 }
 
@@ -28,7 +28,7 @@ int main()
 		auto const address = boost::asio::ip::make_address("127.0.0.1");
 		unsigned short port = static_cast<unsigned short>(10000);
 
-		std::cout << "Server start on port : " << port << std::endl;
+		std::cout << "Server start on " << address << ", port is " << port << std::endl;
 
 		boost::asio::io_context ioc{1};
 
@@ -46,7 +46,7 @@ int main()
 
 		boost::asio::ip::tcp::acceptor acceptor{ioc, {address, port}};
 		boost::asio::ip::tcp::socket socket{ioc};
-		Server(acceptor, socket);
+		Server(acceptor, socket, ioc);
 
 		ioc.run();
 	}

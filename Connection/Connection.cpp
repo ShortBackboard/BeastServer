@@ -3,10 +3,149 @@
 #include "../ServerStateInfo/ServerStateInfo.h"
 auto serverStateInfo = ServerStateInfo::GetInstance();
 
-Connection::Connection(tcp::socket socket)
-    : _socket(std::move(socket))
+Connection::Connection(tcp::socket socket, boost::asio::io_context& ioc)
+    : _socket(std::move(socket)), ws_ptr_(nullptr), _ioc(ioc),_strand(ioc.get_executor())
 {
   std::cout << "one new connection" << std::endl;
+}
+
+// 处理websocket错误码
+void Connection::handle_error(boost::system::error_code ec)
+{
+	std::cerr << "WebSocket error: " << ec.message() << "\n";
+	// Do something to handle the error, such as logging or shutting down the connection
+}
+
+// 转换成websocket连接
+void Connection::convert_websocket(tcp::socket&& socket) {
+	ws_ptr_.reset(new stream<tcp_stream>(std::move(socket)));
+}
+
+// 关闭定时器
+void Connection::cancel_deadline() {
+	_deadline.cancel();
+}
+
+// websocket读
+void Connection::websocket_async_read() {
+	auto self = shared_from_this();
+	// Read a complete message into the buffer's input area asynchronously
+	self->ws_ptr_->async_read(self->_read_buffer, boost::asio::bind_executor(_strand, [self](boost::system::error_code ec, std::size_t bytes_transferred)
+		{
+			try {
+				if (!ec)
+				{
+					// Set text mode if the received message was also text,
+					// otherwise binary mode will be set.
+					self->ws_ptr_->text(self->ws_ptr_->got_text());
+
+					// Echo the received message back to the peer. If the received
+					// message was in text mode, the echoed message will also be
+					// in text mode, otherwise it will be in binary mode.
+					const auto& recv_data = boost::beast::buffers_to_string(self->_read_buffer.data());
+					std::cout << "websocket receive data is " << recv_data << std::endl;
+					self->async_send_message(recv_data);
+
+					// Discard all of the bytes stored in the dynamic buffer.
+					self->_read_buffer.consume(self->_read_buffer.size());
+					self->websocket_async_read();
+				}
+				else
+				{
+					self->handle_error(ec);
+					// An error occurred while reading from the WebSocket connection.
+					//self->ws_ptr_->close(websocket::close_code::none);
+					get_lowest_layer(*(self->ws_ptr_)).close();
+				}
+			}
+			catch (std::exception const& e)
+			{
+				std::cerr << "Error: " << e.what() << std::endl;
+				return;
+			}
+		})
+		);
+}
+
+// 发送消息
+void Connection::async_write(const std::string &message) {
+	auto self = shared_from_this();
+	self->ws_ptr_->async_write(boost::asio::buffer(message.c_str(), message.length()), boost::asio::bind_executor(_strand,
+		[self](boost::system::error_code ec, std::size_t bytes_transferred)
+		{
+			try {
+				if (!ec)
+				{
+					std::string send_msg;
+					// Message sent successfully
+					{
+						std::lock_guard<std::mutex> lock(self->_mutex);
+						self->_send_que.pop();
+						if (self->_send_que.empty()) {
+							return;
+						}
+
+						send_msg = self->_send_que.front();
+					}
+					self->async_write(send_msg);
+				}
+				else
+				{
+					// An error occurred while sending the message
+					self->handle_error(ec);
+					get_lowest_layer(*(self->ws_ptr_)).close();
+				}
+			}
+			catch (std::exception const& e) {
+				std::cerr << "Error: " << e.what() << std::endl;
+				return;
+			}
+		}));
+}
+
+// 异步写入消息队列
+void Connection::async_send_message(const std::string &message)
+{
+	size_t que_size = 0;
+	{
+		std::lock_guard<std::mutex> lock(_mutex);
+		que_size = _send_que.size();
+		_send_que.push(message);
+	}
+
+	if (que_size > 0) {
+		return;
+	}
+
+	async_write(message);
+}
+
+// 升级http协议
+void Connection::upgrade_websocket(const tcp::socket&& socket, std::size_t bytes_transferred){
+	auto self = shared_from_this();
+	// Construct the stream, transferring ownership of the socket
+	cancel_deadline();
+	convert_websocket(std::move(_socket));
+	// Clients SHOULD NOT begin sending WebSocket
+	// frames until the server has provided a response.
+	BOOST_ASSERT(_read_buffer.size() == 0);
+
+	// Accept the upgrade request
+	// Accept the upgrade request asynchronously
+	self->ws_ptr_->async_accept(self->_request,
+		[self](boost::system::error_code ec)
+		{
+			if (!ec)
+			{
+				self->websocket_async_read();
+			}
+			else
+			{
+				// An error occurred while accepting the WebSocket connection.
+				self->handle_error(ec);
+				get_lowest_layer(*(self->ws_ptr_)).close();
+			}
+		});
 }
 
 // 发送响应
@@ -175,8 +314,18 @@ void Connection::read_request()
              std::size_t bytes_transferred)
       {
         boost::ignore_unused(bytes_transferred);
-        if (!ec)
-          self->process_request();
+        if (ec) {
+				std::cout << "async_read error ! msg is : " << ec.message() << std::endl;
+				return;
+			  }
+			  if (websocket::is_upgrade(self->_request)) {
+        // 处理websocket请求
+				self->upgrade_websocket(std::move(self->_socket), bytes_transferred);
+			  }
+			  else {
+				// 处理http请求
+				self->process_request();
+			  }
       });
 }
 
@@ -192,6 +341,7 @@ void Connection::check_deadline()
         if (!ec)
         {
           // Close socket to cancel any outstanding operation.
+          std::cout << "timeout" << std::endl;
           self->_socket.close(ec);
         }
       });

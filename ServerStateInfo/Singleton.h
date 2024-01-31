@@ -43,7 +43,7 @@ public:
     }
     
     ~Singleton() {
-        std::cout << " Base Singleton Destructor" << std::endl;
+        std::cout << "Base Singleton Destructor" << std::endl;
     }
 };
 
